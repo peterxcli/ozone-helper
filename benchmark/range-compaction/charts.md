@@ -22,8 +22,8 @@ The following charts are available in the `comparison_charts` directory:
 - ![Compaction write bytes](comparison_charts/Compaction_write_bytes_comparison.png)
 
 ### DB Metrics
-- ![DB get 95%-tile](comparison_charts/DB_get_95%-tile_comparison.png)
-- ![DB get 99%-tile](comparison_charts/DB_get_99%-tile_comparison.png)
+- ![DB get 95%-tile](comparison_charts/DB_get_95__tile_comparison.png)
+- ![DB get 99%-tile](comparison_charts/DB_get_99__tile_comparison.png)
 - ![DB get average latency](comparison_charts/DB_get_average_latency_comparison.png)
 - ![DB get median](comparison_charts/DB_get_median_comparison.png)
 
@@ -48,9 +48,9 @@ The following charts are available in the `comparison_charts` directory:
 - ![SST file total size](comparison_charts/SST_file_total_size_comparison.png)
 
 ### Seek Metrics
-- ![Seek 95%-tile latency (μs)](comparison_charts/Seek_95%-tile_latency_(μs)_comparison.png)
-- ![Seek 99%-tile latency (μs)](comparison_charts/Seek_99%-tile_latency_(μs)_comparison.png)
-- ![Seek average latency (μs)](comparison_charts/Seek_average_latency_(μs)_comparison.png)
+- ![Seek 95%-tile latency (μs)](comparison_charts/Seek_95__tile_latency__us__comparison.png)
+- ![Seek 99%-tile latency (μs)](comparison_charts/Seek_99__tile_latency__us__comparison.png)
+- ![Seek average latency (μs)](comparison_charts/Seek_average_latency__us__comparison.png)
 - ![Seek max latency](comparison_charts/Seek_max_latency_comparison.png)
 - ![Seek median latency](comparison_charts/Seek_median_latency_comparison.png)
 

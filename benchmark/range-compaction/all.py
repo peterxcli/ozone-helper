@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -204,6 +205,17 @@ for metric in common_metrics:
         metrics_by_category[category] = []
     metrics_by_category[category].append(metric)
 
+
+def normalize_filename(name):
+    # Replace μ and µ with u
+    name = name.replace("μ", "u").replace("µ", "u")
+    # Replace spaces with underscores
+    name = name.replace(" ", "_")
+    # Replace all non-alphanumeric and non-underscore chars with underscores
+    name = re.sub(r"[^A-Za-z0-9_]", "_", name)
+    return name
+
+
 # Generate markdown content
 markdown_content = [
     "# Range Compaction Benchmark Charts\n",
@@ -220,7 +232,7 @@ markdown_content = [
 for category, metrics in sorted(metrics_by_category.items()):
     markdown_content.append(f"### {category} Metrics")
     for metric in sorted(metrics):
-        chart_name = f"{metric.replace(' ', '_')}_comparison.png"
+        chart_name = f"{normalize_filename(metric)}_comparison.png"
         markdown_content.append(f"- ![{metric}](comparison_charts/{chart_name})")
     markdown_content.append("")
 
@@ -347,7 +359,7 @@ for metric in common_metrics:
         plt.tight_layout()
 
         # Save figure
-        save_name = f"{metric.replace(' ', '_')}_comparison.png"
+        save_name = f"{normalize_filename(metric)}_comparison.png"
         plt.savefig(OUT_DIR / save_name, dpi=1000)
         plt.close()
         print(f"Saved {metric} to {OUT_DIR / save_name}")
