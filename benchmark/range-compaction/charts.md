@@ -4,9 +4,10 @@ This document provides an overview of all the charts generated from the range co
 
 ## Overview
 
-The benchmark compares two configurations:
+The benchmark compares three configurations:
 - **Enable Range Compaction**: `100M-20:8:1:enable-range-compaction:disable-peridioc-full-compaction`
 - **Disable Range Compaction**: `100M-20:8:1:disable-range-compaction:disable-peridioc-full-compaction`
+- **Disable Range Compaction + Enable Periodic Full Compaction**: `100M-20:8:1:disable-range-compaction:enable-peridioc-full-compaction`
 
 ## Charts
 
@@ -48,9 +49,9 @@ The following charts are available in the `comparison_charts` directory:
 - ![SST file total size](comparison_charts/SST_file_total_size_comparison.png)
 
 ### Seek Metrics
-- ![Seek 95%-tile latency (μs)](comparison_charts/Seek_95__tile_latency__us__comparison.png)
-- ![Seek 99%-tile latency (μs)](comparison_charts/Seek_99__tile_latency__us__comparison.png)
-- ![Seek average latency (μs)](comparison_charts/Seek_average_latency__us__comparison.png)
+- ![Seek 95%-tile latency](comparison_charts/Seek_95__tile_latency_comparison.png)
+- ![Seek 99%-tile latency](comparison_charts/Seek_99__tile_latency_comparison.png)
+- ![Seek average latency](comparison_charts/Seek_average_latency_comparison.png)
 - ![Seek max latency](comparison_charts/Seek_max_latency_comparison.png)
 - ![Seek median latency](comparison_charts/Seek_median_latency_comparison.png)
 

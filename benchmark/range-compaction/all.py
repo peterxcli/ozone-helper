@@ -10,6 +10,8 @@ EXPERIMENT1 = "100M-20:8:1:enable-range-compaction:disable-peridioc-full-compact
 EXPERIMENT1_NAME = "Enable Range Compaction"
 EXPERIMENT2 = "100M-20:8:1:disable-range-compaction:disable-peridioc-full-compaction"
 EXPERIMENT2_NAME = "Disable Range Compaction"
+EXPERIMENT3 = "100M-20:8:1:disable-range-compaction:enable-peridioc-full-compaction"
+EXPERIMENT3_NAME = "Disable Range Compaction + Enable Periodic Full Compaction"
 BASE_PATH: Path = Path(__file__).parent  # or set manually, e.g., Path("/path/to/data")
 OUT_DIR = BASE_PATH / "comparison_charts"
 OUT_DIR.mkdir(exist_ok=True)
@@ -29,7 +31,7 @@ METRICS_NEED_SMOOTHING = {
 }
 
 # Metrics that need log scale
-METRICS_NEED_LOG = {"Seek average latency (μs)"}
+METRICS_NEED_LOG = {"Seek average latency"}
 
 # Downsampling window size (in minutes)
 SMOOTHING_WINDOW = 1  # 1 minute window for smoothing
@@ -191,7 +193,10 @@ def get_metric_files(exp_dir):
 # Find all available metrics
 metrics1 = get_metric_files(BASE_PATH / EXPERIMENT1)
 metrics2 = get_metric_files(BASE_PATH / EXPERIMENT2)
-common_metrics = sorted(set(metrics1.keys()) & set(metrics2.keys()))
+metrics3 = get_metric_files(BASE_PATH / EXPERIMENT3)
+common_metrics = sorted(
+    set(metrics1.keys()) & set(metrics2.keys()) & set(metrics3.keys())
+)
 
 # common_metrics = ["Bytes read per second"]
 
@@ -221,9 +226,10 @@ markdown_content = [
     "# Range Compaction Benchmark Charts\n",
     "This document provides an overview of all the charts generated from the range compaction benchmark comparison.\n",
     "## Overview\n",
-    "The benchmark compares two configurations:",
+    "The benchmark compares three configurations:",
     f"- **{EXPERIMENT1_NAME}**: `{EXPERIMENT1}`",
-    f"- **{EXPERIMENT2_NAME}**: `{EXPERIMENT2}`\n",
+    f"- **{EXPERIMENT2_NAME}**: `{EXPERIMENT2}`",
+    f"- **{EXPERIMENT3_NAME}**: `{EXPERIMENT3}`\n",
     "## Charts\n",
     "The following charts are available in the `comparison_charts` directory:\n",
 ]
@@ -270,41 +276,66 @@ def smooth_data(df, window_minutes=SMOOTHING_WINDOW):
     return df
 
 
+def trim_dataframes(df1, df2, df3):
+    """Trim dataframes to match the shortest duration among all experiments."""
+    # Get the minimum duration among all experiments
+    min_duration = min(
+        df1["time_offset"].max(), df2["time_offset"].max(), df3["time_offset"].max()
+    )
+
+    # Trim each dataframe to the minimum duration
+    df1 = df1[df1["time_offset"] <= min_duration]
+    df2 = df2[df2["time_offset"] <= min_duration]
+    df3 = df3[df3["time_offset"] <= min_duration]
+
+    return df1, df2, df3
+
+
 for metric in common_metrics:
     try:
         df1 = pd.read_csv(metrics1[metric], parse_dates=["Time"])
         df2 = pd.read_csv(metrics2[metric], parse_dates=["Time"])
+        df3 = pd.read_csv(metrics3[metric], parse_dates=["Time"])
 
-        if df1.empty or df2.empty:
+        if df1.empty or df2.empty or df3.empty:
             print(f"Skipping {metric}: Empty DataFrame")
             continue
 
         # Get the value column (it's the last column)
         value_col = df1.columns[-1]
-        if value_col not in df1.columns or value_col not in df2.columns:
+        if (
+            value_col not in df1.columns
+            or value_col not in df2.columns
+            or value_col not in df3.columns
+        ):
             print(f"Skipping {metric}: Column {value_col} not found")
             continue
-
-        # Print sample data for debugging
-        # print(f"\nProcessing {metric}:")
-        # print(f"Sample data from {EXPERIMENT1}:")
-        # print(df1[[value_col]].head())
-        # print(f"Sample data from {EXPERIMENT2}:")
-        # print(df2[[value_col]].head())
 
         # Align by time offset
         df1["time_offset"] = (df1["Time"] - df1["Time"].iloc[0]).dt.total_seconds() / 60
         df2["time_offset"] = (df2["Time"] - df2["Time"].iloc[0]).dt.total_seconds() / 60
+        df3["time_offset"] = (df3["Time"] - df3["Time"].iloc[0]).dt.total_seconds() / 60
+
+        # Trim dataframes to match shortest duration
+        df1, df2, df3 = trim_dataframes(df1, df2, df3)
+
+        # Print duration info for debugging
+        print(f"\n{metric} durations:")
+        print(f"{EXPERIMENT1_NAME}: {df1['time_offset'].max():.2f} minutes")
+        print(f"{EXPERIMENT2_NAME}: {df2['time_offset'].max():.2f} minutes")
+        print(f"{EXPERIMENT3_NAME}: {df3['time_offset'].max():.2f} minutes")
 
         # Auto-convert values
         df1["value"] = auto_convert_column(df1, value_col)
         df2["value"] = auto_convert_column(df2, value_col)
+        df3["value"] = auto_convert_column(df3, value_col)
 
         # Drop missing
         df1 = df1.dropna(subset=["value"])
         df2 = df2.dropna(subset=["value"])
+        df3 = df3.dropna(subset=["value"])
 
-        if df1.empty or df2.empty:
+        if df1.empty or df2.empty or df3.empty:
             print(f"Skipping {metric}: No valid data after conversion")
             continue
 
@@ -312,17 +343,19 @@ for metric in common_metrics:
         y_label = metric
         if is_duration_column(df1, value_col):
             unit, scale = get_adaptive_time_unit(
-                pd.concat([df1["value"], df2["value"]])
+                pd.concat([df1["value"], df2["value"], df3["value"]])
             )
             df1["value"] = df1["value"] * scale
             df2["value"] = df2["value"] * scale
+            df3["value"] = df3["value"] * scale
             y_label = f"Time ({unit})"
         elif is_size_column(df1, value_col):
             unit, scale = get_adaptive_size_unit(
-                pd.concat([df1["value"], df2["value"]])
+                pd.concat([df1["value"], df2["value"], df3["value"]])
             )
             df1["value"] = df1["value"] * scale
             df2["value"] = df2["value"] * scale
+            df3["value"] = df3["value"] * scale
             y_label = f"Size ({unit})"
 
         # Apply smoothing if needed
@@ -330,6 +363,7 @@ for metric in common_metrics:
             print(f"Applying smoothing to {metric}")
             df1 = smooth_data(df1)
             df2 = smooth_data(df2)
+            df3 = smooth_data(df3)
 
         # Plot
         plt.figure(figsize=(10, 6))
@@ -341,7 +375,13 @@ for metric in common_metrics:
             df2["value"],
             label=f"{EXPERIMENT2_NAME}",
             linewidth=1,
-            # linestyle="--",
+        )
+        plt.plot(
+            df3["time_offset"],
+            df3["value"],
+            label=f"{EXPERIMENT3_NAME}",
+            linewidth=1,
+            linestyle="--",
         )
         plt.xlabel("Time Offset (minutes)", fontsize=13)
         plt.ylabel(y_label, fontsize=13)
