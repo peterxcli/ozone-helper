@@ -381,7 +381,6 @@ for metric in common_metrics:
             df3["value"],
             label=f"{EXPERIMENT3_NAME}",
             linewidth=1,
-            linestyle="--",
         )
         plt.xlabel("Time Offset (minutes)", fontsize=13)
         plt.ylabel(y_label, fontsize=13)
