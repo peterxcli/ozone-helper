@@ -1,12 +1,173 @@
-# Range Compaction Benchmark
+# SST-Based Intelligent RocksDB Compaction Optimization for Apache Ozone
 
-## Diagram
+**Author:** Chu-Cheng Li
+**Supervising Professor:** Kun-Ta Chung
 
-![Range Compaction Architecture](ozone_range_compaction_architecture_dense.png)
+---
 
-## Benchmark
+## Introduction
 
-### Steup
+Apache Ozone is a next-generation distributed file system designed to overcome the small file limitations of traditional HDFS by using RocksDB for efficient metadata storage. This project introduces an **SST-based intelligent compaction optimization** to address RocksDB performance issues in Ozone, particularly under heavy delete workloads (tombstones).
+
+**ozone:**
+
+![ozone](images/ozone.png)
+
+![ozone-table](images/ozone-table.png)
+
+**rocksdb:**
+
+![rocksdb](images/rocksdb.png)
+
+---
+
+## Key Challenge
+
+* **RocksDB suffers from slow iteration performance when many consecutive tombstones accumulate.**
+
+### RocksDB Seek
+
+![rocksdb-seek](images/rocksdb-seek.png)
+
+1. **Candidate Table Selection:**
+   The iterator consults the Summary (table min/max key) to quickly narrow down which tables might contain the target key.
+2. **Key Search Across Levels:**
+   Both MemTable (latest writes) and all levels of SSTables are scanned to find the smallest key ≥ target.
+3. **Candidate Key Extraction:**
+   The iterator fetches candidate keys from multiple sources in parallel.
+4. **Heap Merge:**
+   Results from each table are merged using a min-heap to return the next smallest key on every `Next()`.
+
+
+### RocksDB Seek with Many Tombstone
+
+![seek with many tombstone](images/iterator-seek-many-tombstone.png)
+
+---
+
+## Proposed Optimization:
+
+### Scan Key Ranges with High Tombstone Density, then Compact Them
+
+**Approach:**
+
+* **Split the entire table into multiple small ranges** using bucket name prefixes.
+
+  * Initially, each bucket forms a single range.
+  * If a range becomes too large, **subdivide** it using SST table boundaries to create smaller, more manageable ranges.
+* **Three main benefits:**
+
+  1. Only compact SSTs with high tombstone ratios, reducing unnecessary resource usage.
+  2. Compacting small SST ranges significantly lowers the impact on overall system performance.
+  3. Enables **customized, optimized splitting logic** tailored to each table's characteristics and access patterns.
+
+### Compaction Workflow
+
+![Compaction Workflow](images/range-compaction-flow.png)
+
+---
+
+### Architecture Diagram
+
+![Architecture Diagram](images/range-compaction-overview.png)
+
+---
+
+## Experimental Results
+
+* **Enabling range compaction in Apache Ozone yields:**
+
+  * **Read latency improvement:**
+
+    * For a dataset with 10⁷ keys:
+
+      * *Average seek latency reduced by over 200x* (from **357ms** to **1.7ms**)
+      * *Maximum seek latency drops by 3.6x* (from **21.6ms** to **6.0ms**)
+  * **Write throughput:**
+
+    * Remains unaffected; normal data ingestion rates are maintained.
+  * **Compaction resource usage:**
+
+    * Average compaction time increases (from 5s to nearly 18s)
+    * Compaction write size frequently spikes to 10MB+ (vs. <6MB without range compaction)
+
+* **Conclusion:**
+  This approach provides much more stable and predictable read performance while keeping write efficiency, at the cost of higher compaction overhead.
+
+---
+
+## Benchmark Workload
+
+* **Total operations:** 8 × 10⁷
+
+  * **Create:** 68.97%
+  * **Delete:** 27.59%
+  * **List:** 3.45%
+
+---
+
+## Visualizations
+
+
+### Bytes Metrics
+- ![Bytes read per second](comparison_charts/Bytes_read_per_second_comparison.png)
+- ![Bytes write per second](comparison_charts/Bytes_write_per_second_comparison.png)
+
+### Compaction Metrics
+- ![Compaction read bytes](comparison_charts/Compaction_read_bytes_comparison.png)
+- ![Compaction time average](comparison_charts/Compaction_time_average_comparison.png)
+- ![Compaction write bytes](comparison_charts/Compaction_write_bytes_comparison.png)
+
+### DB Metrics
+- ![DB get 95%-tile](comparison_charts/DB_get_95__tile_comparison.png)
+- ![DB get 99%-tile](comparison_charts/DB_get_99__tile_comparison.png)
+- ![DB get average latency](comparison_charts/DB_get_average_latency_comparison.png)
+- ![DB get median](comparison_charts/DB_get_median_comparison.png)
+
+### DeletedTable Metrics
+- ![DeletedTable Estimated number of keys](comparison_charts/DeletedTable_Estimated_number_of_keys_comparison.png)
+
+### Flush Metrics
+- ![Flush time average](comparison_charts/Flush_time_average_comparison.png)
+- ![Flush write bytes](comparison_charts/Flush_write_bytes_comparison.png)
+- ![Flush write median latency](comparison_charts/Flush_write_median_latency_comparison.png)
+
+### KeyTable Metrics
+- ![KeyTable Estimated number of keys](comparison_charts/KeyTable_Estimated_number_of_keys_comparison.png)
+
+### Number Metrics
+- ![Number of keys read per second](comparison_charts/Number_of_keys_read_per_second_comparison.png)
+- ![Number of keys written per second](comparison_charts/Number_of_keys_written_per_second_comparison.png)
+- ![Number of next per second](comparison_charts/Number_of_next_per_second_comparison.png)
+- ![Number of seeks per second](comparison_charts/Number_of_seeks_per_second_comparison.png)
+
+### SST Metrics
+- ![SST file total size](comparison_charts/SST_file_total_size_comparison.png)
+
+### Seek Metrics
+- ![Seek 95%-tile latency](comparison_charts/Seek_95__tile_latency_comparison.png)
+- ![Seek 99%-tile latency](comparison_charts/Seek_99__tile_latency_comparison.png)
+- ![Seek average latency](comparison_charts/Seek_average_latency_comparison.png)
+- ![Seek max latency](comparison_charts/Seek_max_latency_comparison.png)
+- ![Seek median latency](comparison_charts/Seek_median_latency_comparison.png)
+
+---
+
+## Acknowledgements
+
+This work was supervised by **Professor Kun-Ta Chung** and carried out as part of ongoing efforts to optimize metadata performance in Apache Ozone.
+
+---
+
+## Citation
+
+If you use this work, please cite:
+
+> **Chu-Cheng Li**, "SST-Based Intelligent RocksDB Compaction Optimization for Apache Ozone, a Next-Generation Distributed File System"
+
+## Appendix
+
+### Benchmark Setup
 
 1. build ozone
 2. clean old cluster and 
@@ -16,9 +177,9 @@ export COMPOSE_FILE=docker-compose.yaml:monitoring.yaml:profiling.yaml
 OZONE_DATANODES=3 ./run.sh -d
 ```
 
-### Run
+#### Run
 
-#### 100M-20:8:1:enable-range-compaction:disable-peridioc-full-compaction
+##### 100M-20:8:1:enable-range-compaction:disable-peridioc-full-compaction
 
 1. append to: `hadoop-ozone/dist/target/ozone-2.1.0-SNAPSHOT/compose/ozone/docker-config`
 ```
@@ -93,7 +254,8 @@ Total execution time (sec): 52888
 Failures: 0
 Successful executions: 84952642
 ```
-#### 100M-20:8:1:disable-range-compaction:disable-peridioc-full-compaction
+
+##### 100M-20:8:1:disable-range-compaction:disable-peridioc-full-compaction
 
 1. remove all additional config in: `hadoop-ozone/dist/target/ozone-2.1.0-SNAPSHOT/compose/ozone/docker-config`
 2. start testing with mixed workload
@@ -163,7 +325,8 @@ Total execution time (sec): 53879
 Failures: 0
 Successful executions: 86217148
 ```
-#### 100M-20:8:1:disable-range-compaction:enable-peridioc-full-compaction
+
+##### 100M-20:8:1:disable-range-compaction:enable-peridioc-full-compaction
 
 1. append config to: `hadoop-ozone/dist/target/ozone-2.1.0-SNAPSHOT/compose/ozone/docker-config`
 ```
